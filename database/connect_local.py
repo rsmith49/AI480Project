@@ -29,6 +29,7 @@ class Connection:
                 res.append(data)
         except mysql.connector.ProgrammingError as err:
             print(err)
+            print(query)
             res = False
 
         return res
