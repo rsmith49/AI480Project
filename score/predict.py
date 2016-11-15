@@ -22,11 +22,12 @@ datenum_to_str = {
 def getBatterFeatures(conn, date):
     features = {}
 
-def scorePlayer(espnID, date, conn, hitter=True):
-    sqlquery = "SELECT fd_points FROM player_daily_" + str(date.year) + " WHERE espnID = "\
-               + str(espnID) + " AND `date` = '" + datenum_to_str[date.month] + " " + str(date.day) + "'"
+def scorePlayer(player, date, conn, hitter=True):
+    sqlquery = "SELECT fd_points FROM " + player.table_prefix + "_daily_" + str(date.year) + " WHERE espnID = "\
+               + str(player.espnID) + " AND `date` = '" + datenum_to_str[date.month] + " " + str(date.day) + "'"
     score = conn.query(sqlquery)
     if score:
         return score[0][0]
     else:
+        print(sqlquery)
         return 0
