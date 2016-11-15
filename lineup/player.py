@@ -1,11 +1,27 @@
 from database.connect_local import Connection
 from score.predict import scorePlayer, datenum_to_str
 
+pos_to_num_map = {
+    'DH': 5,
+    'SP': 1,
+    'RP': 1,
+    'C': 2,
+    '1B': 3,
+    '2B': 4,
+    '3B': 5,
+    'SS': 6,
+    'LF': 7,
+    'CF': 8,
+    'RF': 9
+}
+
 
 class Player:
 
-    def __init__(self, espnID, fd_salary=None):
+    def __init__(self, espnID, pos, name=None, fd_salary=None):
         self.espnID = espnID
+        self.pos = pos_to_num_map[pos]
+        self.name = name
         self.pred_score = {}
         self.fd_salary = {}
         if fd_salary:
@@ -27,7 +43,7 @@ class Player:
             + " " + str(date.day) + "'"
             salary = conn.query(sqlquery)
             if not salary:
-                print("No salary data available for date " + str(date))
+                #print("No salary data available for date " + str(date))
                 conn.close()
                 self.fd_salary[date] = None
                 return False
@@ -44,6 +60,24 @@ class Player:
     def actual_score(self, date):
         return None
 
+    def __eq__(self, other):
+        if (not hasattr(other, 'espnID')) or self.espnID != other.espnID:
+            return False
+        if (not hasattr(other, 'name')) or self.name != other.name:
+            return False
+        if (not hasattr(other, 'table_prefix')) or self.table_prefix != other.table_prefix:
+            return False
+        return True
+
+    def __str__(self):
+        if self.name:
+            return 'Player(' + str(self.espnID) + ', ' + str(self.name) + ')'
+        else:
+            return 'Player(' + str(self.espnID) + ')'
+
+    def __hash__(self):
+        return hash(self.espnID)
+
 
 class Hitter(Player):
 
@@ -53,15 +87,21 @@ class Hitter(Player):
         else:
             conn = Connection()
             conn.connect()
-            self.pred_score[date] = scorePlayer(self.espnID, date, conn)
+            self.pred_score[date] = scorePlayer(self, date, conn)
             conn.close()
             return self.pred_score[date]
+
+    def __str(self):
+        if self.name:
+            return 'Hitter(' + str(self.espnID) + ', ' + str(self.name) + ')'
+        else:
+            return 'Hitter(' + str(self.espnID) + ')'
 
 
 class Pitcher(Player):
 
-    def __init__(self, espnID, fd_salary=None):
-        super().__init__(espnID, fd_salary)
+    def __init__(self, espnID, pos, name=None, fd_salary=None):
+        super().__init__(espnID, pos, name, fd_salary)
         self.table_prefix = 'pitcher'
 
     def predict_score(self, date):
@@ -70,6 +110,12 @@ class Pitcher(Player):
         else:
             conn = Connection()
             conn.connect()
-            self.pred_score[date] = scorePlayer(self.espnID, date, conn, hitter=False)
+            self.pred_score[date] = scorePlayer(self, date, conn, hitter=False)
             conn.close()
             return self.pred_score[date]
+
+    def __str__(self):
+        if self.name:
+            return 'Pitcher(' + str(self.espnID) + ', ' + str(self.name) + ')'
+        else:
+            return 'Pitcher(' + str(self.espnID) + ')'

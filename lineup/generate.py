@@ -6,6 +6,7 @@ import dateutil.parser
 SAL_MIN = 0
 SAL_CAP = 350
 SAL_INC = 1
+FIRST_POS = 1
 
 hitter_list = []
 pitcher_list = []
@@ -32,58 +33,90 @@ def get_potential_players(player_list, date):
 def create_player_lists():
     conn = Connection()
     conn.connect()
-    players = conn.query("SELECT playerName, espnID, position FROM active_players LIMIT 20")
+    players = conn.query("SELECT playerName, espnID, position FROM active_players")
     for playerName, espnID, pos in players:
         if not pos in ['RP', 'SP']:
-            hitter_list.append(Hitter(espnID, playerName))
+            hitter_list.append(Hitter(espnID, pos, playerName))
         else:
-            pitcher_list.append(Pitcher(espnID, playerName))
+            pitcher_list.append(Pitcher(espnID, pos, playerName))
     conn.close()
 
+def getMax(group, row, groups, n):
+    max = 0
+    for ndx in range(0,n):
+        if groups[ndx] == group:
+            if row[ndx] > max:
+                max = row[ndx]
+    return max
+
+def isMaxInGroup(n, w, groups, matrix, N):
+    group = groups[n]
+    max = 0
+    for ndx in range(0, N):
+        if groups[ndx] == group:
+            if matrix[w][ndx] > max:
+                max = matrix[w][ndx]
+    return matrix[w][n] == max
+
 def generate_lineup(date):
-    potential_hitters = get_potential_players(hitter_list, date)
-    potential_pitchers = get_potential_players(pitcher_list, date)
 
-    test_potential = list(potential_hitters)
-    test_potential.extend(list(potential_pitchers))
+    potential_players = get_potential_players(hitter_list, date)
+    potential_players.extend(get_potential_players(pitcher_list, date))
+    potential_players = sorted(potential_players, key = lambda player: player.pos)
 
-    print(len(potential_hitters))
-    print(len(potential_pitchers))
+    N = len(potential_players)
 
-    score_table = [[0 for x in range(SAL_MIN, SAL_CAP, SAL_INC)] for y in range(len(test_potential))]
-    best_lineup = []
-    selected = set()
-    not_selected = set()
-    not_selected.add(test_potential[0])
+    groups = [player.pos for player in potential_players]
 
-    for player_num in range(1,len(test_potential)):
-        not_selected.add(test_potential[player_num])
-        for salary_cap in range(SAL_MIN, SAL_CAP, SAL_INC):
-            if test_potential[player_num].get_salary(date)/100 > salary_cap:
-                score_table[player_num][salary_cap] = score_table[player_num - 1][salary_cap]
+    score_table = [[0  for y in range(N)] for x in range(SAL_MIN, SAL_CAP, SAL_INC)]
+    solution = [[0 for y in range(N)] for x in range(SAL_MIN, SAL_CAP, SAL_INC)]
+
+    for w in range(SAL_MIN, SAL_CAP, SAL_INC):
+        for n in range(0, N):
+            player = potential_players[n]
+
+            if player.pos == FIRST_POS:
+                if player.get_salary(date) / 100 <= w:
+                    score_table[w][n] = player.predict_score(date)
+                    solution[w][n] = True
             else:
-                score1 = score_table[player_num - 1][salary_cap]
-                score2 = score_table[player_num - 1][salary_cap - int(test_potential[player_num].get_salary(date)/100)]\
-                                + test_potential[player_num].predict_score(date)
-                if score1 >= score2:
-                    score_table[player_num][salary_cap] = score1
+                if player.pos != potential_players[n - 1].pos:
+                    opt1 = getMax(potential_players[n - 1].pos, score_table[w], groups, n)
+                    opt2 = -1
+                    if player.get_salary(date) / 100 < w:
+                        opt2 = player.predict_score(date) + getMax(
+                            potential_players[n - 1].pos, score_table[w - int(player.get_salary(date) / 100)], groups, n)
+                    score_table[w][n] = max(opt1, opt2)
+                    solution[w][n] = opt2 > opt1
                 else:
-                    score_table[player_num][salary_cap] = score2
-                    if lineup_cost(best_lineup, date)/100 + test_potential[player_num].get_salary(date)/100 > salary_cap:
-                        best_lineup.sort(key=lambda player: player.predict_score(date))
-                        best_lineup.pop()
-                        best_lineup.append(test_potential[player_num])
-                    else:
-                        best_lineup.append(test_potential[player_num])
+                    opt1 = getMax(player.pos - 1, score_table[w], groups, n)
+                    opt2 = -1
+                    if player.get_salary(date) / 100 < w:
+                        opt2 = player.predict_score(date) + getMax(
+                            player.pos - 1, score_table[w - int(player.get_salary(date) / 100)], groups, n)
+                    score_table[w][n] = max(opt1, opt2)
+                    solution[w][n] = opt2 > opt1
 
-    ndx = 0
-    for player in best_lineup:
-        print(player.name, end=' ')
-        print(score_table[ndx][-1])
-        ndx += 1
-    print(score_lineup(best_lineup, date))
-    print(score_table[-1][-1])
+    to_take = []
+    curr_group = potential_players[-1].pos + 1
+    w = SAL_CAP - 1
+    for n in range(N - 1, -1, -1):
+        player = potential_players[n]
+        if solution[w][n] and isMaxInGroup(n, w, groups, score_table, N) and player.pos < curr_group:
+            to_take.append(player)
+            w -= int(player.get_salary(date) / 100)
+            curr_group = player.pos
+
+    for player in to_take:
+        print(str(player), str(player.pos), str(player.predict_score(date)), str(player.get_salary(date)), sep=', ')
+    print()
+
+    return to_take
+
+
+
 
 
 create_player_lists()
 generate_lineup(dateutil.parser.parse('Apr 6 2015'))
+generate_lineup(dateutil.parser.parse('Apr 6 2016'))
