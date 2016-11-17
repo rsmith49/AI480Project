@@ -12,18 +12,6 @@ FIRST_POS = 1
 hitter_list = []
 pitcher_list = []
 
-def score_lineup(players, date):
-    total_score = 0
-    for player in players:
-        total_score += player.predict_score(date)
-    return total_score
-
-def lineup_cost(players, date):
-    total_cost = 0
-    for player in players:
-        total_cost += player.get_salary(date)
-    return total_cost
-
 def get_potential_players(player_list, date):
     potential_players = []
     for player in player_list:
