@@ -6,6 +6,7 @@ import dateutil.parser
 SAL_MIN = 0
 SAL_CAP = 350
 SAL_INC = 1
+SAL_TO_WEIGHT_RATIO = 100
 FIRST_POS = 1
 
 hitter_list = []
@@ -58,7 +59,7 @@ def isMaxInGroup(n, w, groups, matrix, N):
                 max = matrix[w][ndx]
     return matrix[w][n] == max
 
-def generate_lineup(date):
+def generate_best_lineup(date):
 
     potential_players = get_potential_players(hitter_list, date)
     potential_players.extend(get_potential_players(pitcher_list, date))
@@ -76,24 +77,24 @@ def generate_lineup(date):
             player = potential_players[n]
 
             if player.pos == FIRST_POS:
-                if player.get_salary(date) / 100 <= w:
+                if player.get_salary(date) / SAL_TO_WEIGHT_RATIO <= w:
                     score_table[w][n] = player.predict_score(date)
                     solution[w][n] = True
             else:
                 if player.pos != potential_players[n - 1].pos:
                     opt1 = getMax(potential_players[n - 1].pos, score_table[w], groups, n)
                     opt2 = -1
-                    if player.get_salary(date) / 100 < w:
+                    if player.get_salary(date) / SAL_TO_WEIGHT_RATIO < w:
                         opt2 = player.predict_score(date) + getMax(
-                            potential_players[n - 1].pos, score_table[w - int(player.get_salary(date) / 100)], groups, n)
+                            potential_players[n - 1].pos, score_table[w - int(player.get_salary(date) / SAL_TO_WEIGHT_RATIO)], groups, n)
                     score_table[w][n] = max(opt1, opt2)
                     solution[w][n] = opt2 > opt1
                 else:
                     opt1 = getMax(player.pos - 1, score_table[w], groups, n)
                     opt2 = -1
-                    if player.get_salary(date) / 100 < w:
+                    if player.get_salary(date) / SAL_TO_WEIGHT_RATIO < w:
                         opt2 = player.predict_score(date) + getMax(
-                            player.pos - 1, score_table[w - int(player.get_salary(date) / 100)], groups, n)
+                            player.pos - 1, score_table[w - int(player.get_salary(date) / SAL_TO_WEIGHT_RATIO)], groups, n)
                     score_table[w][n] = max(opt1, opt2)
                     solution[w][n] = opt2 > opt1
 
@@ -104,7 +105,7 @@ def generate_lineup(date):
         player = potential_players[n]
         if solution[w][n] and isMaxInGroup(n, w, groups, score_table, N) and player.pos < curr_group:
             to_take.append(player)
-            w -= int(player.get_salary(date) / 100)
+            w -= int(player.get_salary(date) / SAL_TO_WEIGHT_RATIO)
             curr_group = player.pos
 
     for player in to_take:
@@ -118,5 +119,5 @@ def generate_lineup(date):
 
 
 create_player_lists()
-generate_lineup(dateutil.parser.parse('Apr 6 2015'))
-generate_lineup(dateutil.parser.parse('Apr 6 2016'))
+generate_best_lineup(dateutil.parser.parse('Apr 6 2015'))
+generate_best_lineup(dateutil.parser.parse('Apr 6 2016'))
