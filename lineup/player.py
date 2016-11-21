@@ -1,5 +1,6 @@
 from database.connect_local import Connection
 from score.predict import scorePlayer, datenum_to_str
+from dateutil.parser import parse
 
 pos_to_num_map = {
     'DH': 5,
@@ -20,7 +21,10 @@ class Player:
 
     def __init__(self, espnID, pos, name=None, fd_salary=None):
         self.espnID = espnID
-        self.pos = pos_to_num_map[pos]
+        if pos in [1, 2, 3, 4, 5, 6, 7, 8, 9]:
+            self.pos = pos
+        else:
+            self.pos = pos_to_num_map[pos]
         self.name = name
         self.pred_score = {}
         self.fd_salary = {}
@@ -53,9 +57,26 @@ class Player:
             return salary
 
     def load_salaries(self, dates):
-        for date in dates:
-            self.get_salary(date)
+        if dates == self.fd_salary.keys():
+            return
+        conn = Connection()
+        conn.connect()
 
+        distinct_years = list(set([date.year for date in dates]))
+
+        for year in distinct_years:
+            sqlquery = "SELECT `date`, fd_salary FROM " + self.table_prefix + "_daily_" + str(year)\
+                    + " WHERE espnID = " + str(self.espnID) + " AND `date` in ("
+            for date in [date for date in dates if date.year == year]:
+                sqlquery += "'" + datenum_to_str[date.month] + " " + str(date.day) + "',"
+            sqlquery = sqlquery[:-1] + ")"
+
+            salaries = conn.query(sqlquery)
+            for date_str, salary in salaries:
+                date = parse(date_str + " " + str(year))
+                self.fd_salary[date] = salary
+
+        conn.close()
 
     def actual_score(self, date):
         return None
