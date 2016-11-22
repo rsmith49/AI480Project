@@ -51,24 +51,22 @@ def getBestInGroup(group, players, w, groups, matrix, N, date, solution):
                 max = matrix[w][ndx]
                 maxndx = ndx
                 best_weight = players[ndx].get_salary(date)
-    return players[maxndx]
+    if maxndx >= 0:
+        return players[maxndx]
+    else:
+        return None
 
-def isBestInGroup(player, players, w, groups, matrix, N, pos_inc):
+def isBestInGroup(player, players, w, groups, matrix, N, pos_inc, date, solution):
     if pos_inc == 0:
         return False
+    new_weight = w
     for pos in range(1, pos_inc + 1):
         group = player.pos_num - pos
-        max = 0
-        maxndx = -1
-        for ndx in range(0, N):
-            if groups[ndx] == group:
-                if matrix[w][ndx] > max:
-                    max = matrix[w][ndx]
-                    maxndx = ndx
-        if max == 0:
-            return False
-        if players[maxndx] == player:
+        best_player = getBestInGroup(group, players, new_weight, groups, matrix, N, date, solution)
+        if best_player == player:
             return True
+        if best_player:
+            new_weight -= int(best_player.get_salary(date) / SAL_TO_WEIGHT_RATIO)
     return False
 
 def isMaxInGroup(n, w, groups, matrix, N):
@@ -175,7 +173,7 @@ def generate_best_lineup_2(date):
             elif player.pos_num in COMBINED_POSITIONS  and w > player.get_salary(date) / SAL_TO_WEIGHT_RATIO\
                     and isBestInGroup(player, potential_players,
                                       w - int(player.get_salary(date) / SAL_TO_WEIGHT_RATIO), groups,
-                                      score_table, N, player.pos_num - COMBINED_POSITIONS[0]):
+                                      score_table, N, player.pos_num - COMBINED_POSITIONS[0], date, solution):
                 #print(player)
                 score_table[w][n] = getMax(potential_players[n - 1].pos_num, score_table[w], groups, n)
                 solution[w][n] = False
@@ -243,6 +241,8 @@ def getLineupsForDates(dates):
             weight += player.get_salary(date)
         if weight / SAL_TO_WEIGHT_RATIO > SAL_CAP:
             print("UH OH, lineup is too big")
+        if len(set(lineup)) < len(lineup):
+            print("UH OH, lineup has repeats", end=' -- ')
         return score
 
     lineups = []
@@ -254,7 +254,7 @@ def getLineupsForDates(dates):
         print("lineup 2 score: " + str(score_lineup(lineup2, date)))
         print()
 
-        lineups.append((date, generate_best_lineup_2(date)))
+        lineups.append((date, lineup2))
 
     return lineups
 
@@ -265,7 +265,7 @@ for day_num in range(6, 20):
 #dates = [dateutil.parser.parse('Apr 6 2015'), dateutil.parser.parse('Apr 6 2016')]
 best_lineups = getLineupsForDates(dates)
 
-# DATE TO USE: 4/19/15
+# DATE TO USE: 4/17/15
 
 for date, lineup in best_lineups:
     print("Date: " + str(date))
