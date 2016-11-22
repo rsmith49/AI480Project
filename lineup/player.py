@@ -16,15 +16,29 @@ pos_to_num_map = {
     'RF': 9
 }
 
+num_to_pos_map = {
+    1: 'SP',
+    2: 'C',
+    3: '1B',
+    4: '2B',
+    5: '3B',
+    6: 'SS',
+    7: 'LF',
+    8: 'CF',
+    9: 'RF'
+}
+
 
 class Player:
 
     def __init__(self, espnID, pos, name=None, fd_salary=None):
         self.espnID = espnID
         if pos in [1, 2, 3, 4, 5, 6, 7, 8, 9]:
-            self.pos = pos
+            self.pos_num = pos
+            self.position = num_to_pos_map[pos]
         else:
-            self.pos = pos_to_num_map[pos]
+            self.pos_num = pos_to_num_map[pos]
+            self.position = pos
         self.name = name
         self.pred_score = {}
         self.fd_salary = {}
@@ -84,10 +98,6 @@ class Player:
     def __eq__(self, other):
         if (not hasattr(other, 'espnID')) or self.espnID != other.espnID:
             return False
-        if (not hasattr(other, 'name')) or self.name != other.name:
-            return False
-        if (not hasattr(other, 'table_prefix')) or self.table_prefix != other.table_prefix:
-            return False
         return True
 
     def __str__(self):
@@ -112,11 +122,17 @@ class Hitter(Player):
             conn.close()
             return self.pred_score[date]
 
-    def __str(self):
+    def __str__(self):
         if self.name:
-            return 'Hitter(' + str(self.espnID) + ', ' + str(self.name) + ')'
+            return 'Hitter(' + str(self.name) + ', ' + str(self.position) + ')'
         else:
-            return 'Hitter(' + str(self.espnID) + ')'
+            return 'Hitter(' + str(self.espnID) + ', ' + str(self.position) + ')'
+
+    def __copy__(self):
+        new_hitter = Hitter(self.espnID, self.pos_num, self.name)
+        new_hitter.fd_salary = self.fd_salary
+        new_hitter.pred_score = self.pred_score
+        return new_hitter
 
 
 class Pitcher(Player):
