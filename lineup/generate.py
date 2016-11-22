@@ -209,15 +209,6 @@ def generate_best_lineup_2(date):
         to_take.append(player)
 
 
-
-    """for n in range(N - 1, -1, -1):
-        player = potential_players[n]
-        if solution[w][n] and isMaxInGroup(n, w, groups, score_table, N) \
-                and player.pos_num < curr_group:
-            to_take.append(player)
-            w -= int(player.get_salary(date) / SAL_TO_WEIGHT_RATIO)
-            curr_group = player.pos_num"""
-
     # for player in to_take:
     #    print(str(player), str(player.pos_num), str(player.predict_score(date)), str(player.get_salary(date)), sep=', ')
     # print()
@@ -233,7 +224,7 @@ def getLineupsForDates(dates):
     for pitcher in pitcher_list:
         pitcher.load_salaries(dates)
 
-    def score_lineup(lineup, date):
+    """def score_lineup(lineup, date):
         score = 0
         weight = 0
         for player in lineup:
@@ -243,32 +234,33 @@ def getLineupsForDates(dates):
             print("UH OH, lineup is too big")
         if len(set(lineup)) < len(lineup):
             print("UH OH, lineup has repeats", end=' -- ')
-        return score
+        return score"""
 
     lineups = []
     for date in dates:
-        print("Date: " + str(date))
-        lineup1 = generate_best_lineup(date)
-        print("lineup 1 score: " + str(score_lineup(lineup1, date)))
+        #print("Date: " + str(date))
+        #lineup1 = generate_best_lineup(date)
+        #print("lineup 1 score: " + str(score_lineup(lineup1, date)))
         lineup2 = generate_best_lineup_2(date)
-        print("lineup 2 score: " + str(score_lineup(lineup2, date)))
-        print()
+        #print("lineup 2 score: " + str(score_lineup(lineup2, date)))
+        #print()
 
         lineups.append((date, lineup2))
 
     return lineups
 
-dates = []
-for day_num in range(6, 20):
-    dates.append(dateutil.parser.parse('Apr ' + str(day_num) + ' 2015'))
+if __name__ == '__main__':
+    dates = []
+    for day_num in range(6, 20):
+        dates.append(dateutil.parser.parse('Apr ' + str(day_num) + ' 2015'))
 
-#dates = [dateutil.parser.parse('Apr 6 2015'), dateutil.parser.parse('Apr 6 2016')]
-best_lineups = getLineupsForDates(dates)
+    #dates = [dateutil.parser.parse('Apr 6 2015'), dateutil.parser.parse('Apr 6 2016')]
+    best_lineups = getLineupsForDates(dates)
 
-# DATE TO USE: 4/17/15
+    # DATE TO USE: 4/17/15
 
-for date, lineup in best_lineups:
-    print("Date: " + str(date))
-    for player in lineup:
-        print(str(player), end=', ')
-    print()
+    for date, lineup in best_lineups:
+        print("Date: " + str(date))
+        for player in lineup:
+            print(str(player), end=', ')
+        print()

@@ -1,4 +1,5 @@
 import sklearn
+from sklearn.neural_network import MLPRegressor
 from database.connect_local import Connection
 from datetime import datetime, timedelta
 import dateutil.parser
@@ -19,7 +20,7 @@ datenum_to_str = {
 }
 
 # conn should already have connected
-def getBatterFeatures(conn, date):
+def getBatterFeatures(conn, player, date):
     features = {}
 
 def scorePlayer(player, date, conn, hitter=True):
@@ -31,3 +32,7 @@ def scorePlayer(player, date, conn, hitter=True):
     else:
         print(sqlquery)
         return 0
+
+
+if __name__ == '__main__':
+    pass
