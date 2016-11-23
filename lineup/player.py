@@ -1,6 +1,21 @@
 from database.connect_local import Connection
-from score.predict import scorePlayer, datenum_to_str
+import score.predict
 from dateutil.parser import parse
+
+datenum_to_str = {
+    1: 'Jan',
+    2: 'Feb',
+    3: 'Mar',
+    4: 'Apr',
+    5: 'May',
+    6: 'Jun',
+    7: 'Jul',
+    8: 'Aug',
+    9: 'Sep',
+    10: 'Oct',
+    11: 'Nov',
+    12: 'Dec'
+}
 
 pos_to_num_map = {
     'DH': 5,
@@ -42,13 +57,21 @@ class Player:
         self.name = name
         self.pred_score = {}
         self.fd_salary = {}
+        self.real_score = {}
         if fd_salary:
             for key in fd_salary.keys():
                 self.fd_salary[key] = fd_salary[key]
         self.table_prefix = "player"
 
     def predict_score(self, date):
-        pass
+        if date in self.pred_score:
+            return self.pred_score[date]
+        else:
+            conn = Connection()
+            conn.connect()
+            self.pred_score[date] = score.predict.scorePlayer(self, date, conn)
+            conn.close()
+            return self.pred_score[date]
 
     def get_salary(self, date):
         if date in self.fd_salary:
@@ -71,17 +94,19 @@ class Player:
             return salary
 
     def load_salaries(self, dates):
-        if dates == self.fd_salary.keys():
+        new_dates = [date for date in dates if not dates in self.fd_salary.keys()]
+        if len(new_dates) == 0:
             return
+
         conn = Connection()
         conn.connect()
 
-        distinct_years = list(set([date.year for date in dates]))
+        distinct_years = list(set([date.year for date in new_dates]))
 
         for year in distinct_years:
             sqlquery = "SELECT `date`, fd_salary FROM " + self.table_prefix + "_daily_" + str(year)\
                     + " WHERE espnID = " + str(self.espnID) + " AND `date` in ("
-            for date in [date for date in dates if date.year == year]:
+            for date in [date for date in new_dates if date.year == year]:
                 sqlquery += "'" + datenum_to_str[date.month] + " " + str(date.day) + "',"
             sqlquery = sqlquery[:-1] + ")"
 
@@ -93,7 +118,45 @@ class Player:
         conn.close()
 
     def actual_score(self, date):
-        return None
+        if date in self.real_score:
+            return self.real_score[date]
+        conn = Connection()
+        conn.connect()
+
+        sqlquery = "SELECT fd_points FROM " + self.table_prefix + "_daily_" + str(date.year) + " WHERE espnID = " \
+                   + str(self.espnID) + " AND `date` = '" + datenum_to_str[date.month] + " " + str(date.day) + "'"
+        score = conn.query(sqlquery)
+        if score:
+            score = score[0][0]
+        else:
+            score = None
+        self.real_score[date] = score
+
+        return score
+
+    def load_actual_scores(self, dates):
+        new_dates = [date for date in dates if not date in self.fd_salary.keys()]
+        if len(new_dates) == 0:
+            return
+
+        conn = Connection()
+        conn.connect()
+
+        distinct_years = list(set([date.year for date in new_dates]))
+
+        for year in distinct_years:
+            sqlquery = "SELECT `date`, fd_points FROM " + self.table_prefix + "_daily_" + str(year) \
+                       + " WHERE espnID = " + str(self.espnID) + " AND `date` in ("
+            for date in [date for date in new_dates if date.year == year]:
+                sqlquery += "'" + datenum_to_str[date.month] + " " + str(date.day) + "',"
+            sqlquery = sqlquery[:-1] + ")"
+
+            scores = conn.query(sqlquery)
+            for date_str, score in scores:
+                date = parse(date_str + " " + str(year))
+                self.real_score[date] = score
+
+        conn.close()
 
     def __eq__(self, other):
         if (not hasattr(other, 'espnID')) or self.espnID != other.espnID:
@@ -111,16 +174,6 @@ class Player:
 
 
 class Hitter(Player):
-
-    def predict_score(self, date):
-        if date in self.pred_score:
-            return self.pred_score[date]
-        else:
-            conn = Connection()
-            conn.connect()
-            self.pred_score[date] = scorePlayer(self, date, conn)
-            conn.close()
-            return self.pred_score[date]
 
     def __str__(self):
         if self.name:
@@ -140,16 +193,6 @@ class Pitcher(Player):
     def __init__(self, espnID, pos, name=None, fd_salary=None):
         super().__init__(espnID, pos, name, fd_salary)
         self.table_prefix = 'pitcher'
-
-    def predict_score(self, date):
-        if date in self.pred_score:
-            return self.pred_score[date]
-        else:
-            conn = Connection()
-            conn.connect()
-            self.pred_score[date] = scorePlayer(self, date, conn, hitter=False)
-            conn.close()
-            return self.pred_score[date]
 
     def __str__(self):
         if self.name:
