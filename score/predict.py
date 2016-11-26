@@ -65,14 +65,14 @@ def find_previous_n_game_scores(conn, player, date, n, scores_loaded=True):
 # THIS IS THE MOST IMPORTANT METHOD
 def getHitterFeatures(conn, player, date):
     features = []
-    features = find_previous_n_game_scores(conn, player, date, HITTER_GAMES_BACK)
+    features.append(find_previous_n_game_scores(conn, player, date, HITTER_GAMES_BACK))
 
     return features
 
 # THIS IS THE MOST IMPORTANT METHOD
 def getPitcherFeatures(conn, player, date):
     features = []
-    features = find_previous_n_game_scores(conn, player, date, PITCHER_GAMES_BACK)
+    features.append(find_previous_n_game_scores(conn, player, date, PITCHER_GAMES_BACK))
 
     return features
 

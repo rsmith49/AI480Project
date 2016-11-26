@@ -5,6 +5,19 @@ from database.connect_local import Connection
 from score.predict import getPlayerFeatures, datenum_to_str
 from lineup.player import Hitter, Pitcher
 from datetime import datetime, timedelta
+import random
+
+hitter_params = {
+    'hidden_layer_sizes': (5, 5),
+    'solver': 'lbfgs',
+    'max_iter': 1000
+}
+
+pitcher_params = {
+    'hidden_layer_sizes': (3, 3),
+    'solver': 'lbfgs',
+    'max_iter': 1000
+}
 
 PITCHER_FILE_PREFIX = 'Pitcher_NNR_Model_'
 HITTER_FILE_PREFIX = 'Hitter_NNR_Model'
@@ -14,12 +27,9 @@ def saveModel(model, filepath):
     joblib.dump(model, filepath)
 
 
-# must create separate model for pitcher and hitter
-def trainPlayerModel(dates, players):
+def getInputOutput(dates, players):
     conn = Connection()
     conn.connect()
-    model = MLPRegressor(activation='logistic')
-
     # To speed it up (not fully optimized, but oh well)
     for player in players:
         player.load_actual_scores(dates)
@@ -29,13 +39,29 @@ def trainPlayerModel(dates, players):
     for date in dates:
         for player in players:
             train_x.append(getPlayerFeatures(conn, player, date))
-            train_y.append(player.actual_score(date))
+            if player.actual_score(date):
+                train_y.append(player.actual_score(date))
+            else:
+                train_y.append(0)
     conn.close()
+
+    return train_x, train_y
+
+# must create separate model for pitcher and hitter
+def trainPlayerModel(dates, players):
+
+    model = MLPRegressor()
+    if players[0].__class__ == Hitter:
+        model.set_params(**hitter_params)
+    else:
+        model.set_params(**pitcher_params)
+
+    train_x, train_y = getInputOutput(dates, players)
     model.fit(train_x, train_y)
 
     return model
 
-def create_models(dates, save_model=False):
+def create_models(dates, should_test = False, test_perc = .1, save_model=False):
     conn = Connection()
     conn.connect()
 
@@ -78,10 +104,31 @@ def create_models(dates, save_model=False):
     hitters = list(set(hitters))
     pitchers = list(set(pitchers))
 
+    if should_test:
+        random.shuffle(hitters)
+        random.shuffle(pitchers)
+        test_hitters = hitters[:int(test_perc * len(hitters))]
+        train_hitters = hitters[int(test_perc * len(hitters)):]
+        test_pitchers = pitchers[:int(test_perc * len(pitchers))]
+        train_pitchers = pitchers[int(test_perc * len(pitchers)):]
+
+    else:
+        train_hitters = hitters
+        train_pitchers = pitchers
+
     print("Training Hitters")
-    hitterModel = trainPlayerModel(dates, hitters)
+    hitterModel = trainPlayerModel(dates, train_hitters)
+
     print("Training Pitchers")
-    pitcherModel = trainPlayerModel(dates, pitchers)
+    pitcherModel = trainPlayerModel(dates, train_pitchers)
+
+    if should_test:
+        test_hitter_data_in, test_hitter_data_out = getInputOutput(dates, test_hitters)
+        test_pitcher_data_in, test_pitcher_data_out = getInputOutput(dates, test_pitchers)
+
+        print("Hitter model R^2 on test data: " + str(hitterModel.score(test_hitter_data_in, test_hitter_data_out)))
+        print("Pitcher model R^2 on test data: " + str(pitcherModel.score(test_pitcher_data_in, test_pitcher_data_out)))
+
 
     if save_model:
         curr_time = datetime.now()
@@ -99,8 +146,9 @@ if __name__ == '__main__':
     dates = []
     conn = Connection()
     conn.connect()
-    sqlquery = 'SELECT DISTINCT `date` FROM player_daily_2014 LIMIT 30'
+    sqlquery = 'SELECT DISTINCT `date` FROM player_daily_2014 WHERE datenum > 735700'
     datestrs = conn.query(sqlquery)
+    conn.close()
     dates = [parse(datestr[0] + ' 2014') for datestr in datestrs]
 
-    create_models(dates, save_model=True)
+    create_models(dates, should_test=True, save_model=False)
