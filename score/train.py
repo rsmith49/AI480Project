@@ -151,4 +151,4 @@ if __name__ == '__main__':
     conn.close()
     dates = [parse(datestr[0] + ' 2014') for datestr in datestrs]
 
-    create_models(dates, should_test=True, save_model=False)
+    create_models(dates, should_test=True, save_model=True)

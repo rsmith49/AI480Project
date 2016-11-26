@@ -158,6 +158,15 @@ class Player:
 
         conn.close()
 
+    def dates_scored(self):
+        return self.real_score.keys()
+
+    def sals_loaded(self):
+        return self.fd_salary.keys()
+
+    def dates_predicted(self):
+        return self.pred_score.keys()
+
     def __eq__(self, other):
         if (not hasattr(other, 'espnID')) or self.espnID != other.espnID:
             return False

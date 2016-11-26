@@ -6,6 +6,16 @@ from lineup.player import Hitter, Pitcher, Player
 from datetime import datetime, timedelta
 import dateutil.parser
 
+# for some reason the datenum's in the database are off by a ton
+DATE_OFFSET = 719529
+epoch = datetime.utcfromtimestamp(0)
+
+def datenumOf(datetime):
+    return (datetime - epoch).total_seconds() + DATE_OFFSET
+
+def tableName(player, date):
+    return player.table_prefix + '_daily_' + str(date.year)
+
 BEST_HITTER_MODEL_FILEPATH = ''
 BEST_PITCHER_MODEL_FILEPATH = ''
 
@@ -61,11 +71,27 @@ def find_previous_n_game_scores(conn, player, date, n, scores_loaded=True):
             scores[ndx] = 0
     return scores
 
+def findAvgScoreForYear(conn, player, end_date, scores_loaded=True):
+    if scores_loaded:
+        avg = 0
+        n = 0
+        for date in player.dates_scored():
+            if date < end_date and date.year == end_date.year:
+                avg += player.actual_score(end_date)
+                n += 1
+        avg /= n
+    else:
+        avg = conn.query('SELECT avg(fd_points) FROM ' + tableName(player, end_date) +
+                         ' WHERE espnID = ' + str(player.espnID) + ' AND datenum < ' +
+                         str(datenumOf(end_date)))
+    return avg
+
 # conn should already have connected
 # THIS IS THE MOST IMPORTANT METHOD
 def getHitterFeatures(conn, player, date):
     features = []
     features.append(find_previous_n_game_scores(conn, player, date, HITTER_GAMES_BACK))
+    features.append(findAvgScoreForYear(conn, player, date))
 
     return features
 
@@ -73,6 +99,7 @@ def getHitterFeatures(conn, player, date):
 def getPitcherFeatures(conn, player, date):
     features = []
     features.append(find_previous_n_game_scores(conn, player, date, PITCHER_GAMES_BACK))
+    features.append(findAvgScoreForYear(conn, player, date))
 
     return features
 
