@@ -1,11 +1,15 @@
 import mysql.connector
+import os.path
+import json
 
-config = {'user': 'root',
+default_config = {'user': 'root',
     'password': '',
     'host':'0.0.0.0',
     'port': 8889,
     'database': 'MLBDaily'
 }
+
+AWS_CFG_FILE = "aws_db_connection.txt"
 
 class Connection:
 
@@ -18,7 +22,16 @@ class Connection:
         self.cnx.close()
 
     def connect(self):
-        self.cnx = mysql.connector.connect(**config)
+        #Check for our local MySQL config file; if it exists, read the config object from there.
+        #otherwise, use the default_config object.
+        if (os.path.isfile(AWS_CFG_FILE)):
+            cfg_file = open(AWS_CFG_FILE, 'r')
+            aws_config = json.load(cfg_file)
+            print ("found AWS config object in " + AWS_CFG_FILE)
+            self.cnx = mysql.connector.connect(**aws_config)
+        else:
+            self.cnx = mysql.connector.connect(**default_config)
+
         self.cursor = self.cnx.cursor()
 
     def query(self, query):
