@@ -11,16 +11,16 @@ DATE_OFFSET = 719529
 epoch = datetime.utcfromtimestamp(0)
 
 def datenumOf(datetime):
-    return (datetime - epoch).total_seconds() + DATE_OFFSET
+    return (datetime - epoch).total_seconds() / (24 * 60 * 60) + DATE_OFFSET
 
 def tableName(player, date):
     return player.table_prefix + '_daily_' + str(date.year)
 
-BEST_HITTER_MODEL_FILEPATH = ''
-BEST_PITCHER_MODEL_FILEPATH = ''
+BEST_HITTER_MODEL_FILEPATH = 'score/Hitter_NNR_Model2016_11_26__9_37_51.pkl'
+BEST_PITCHER_MODEL_FILEPATH = 'score/Pitcher_NNR_Model_2016_11_26__9_37_51.pkl'
 
 HITTER_GAMES_BACK = 7
-PITCHER_GAMES_BACK = 3
+PITCHER_GAMES_BACK = 7
 
 datenum_to_str = {
     1: 'Jan',
@@ -40,9 +40,8 @@ datenum_to_str = {
 def load_model(filepath):
     return joblib.load(filepath)
 
-if __name__ == '__main__':
-    hitter_model = load_model(BEST_HITTER_MODEL_FILEPATH)
-    pitcher_model = load_model(BEST_PITCHER_MODEL_FILEPATH)
+hitter_model = load_model(BEST_HITTER_MODEL_FILEPATH)
+pitcher_model = load_model(BEST_PITCHER_MODEL_FILEPATH)
 
 def find_previous_n_game_scores(conn, player, date, n, scores_loaded=True):
     if scores_loaded:
@@ -75,31 +74,39 @@ def findAvgScoreForYear(conn, player, end_date, scores_loaded=True):
     if scores_loaded:
         avg = 0
         n = 0
-        for date in player.dates_scored():
-            if date < end_date and date.year == end_date.year:
+        prev_dates = [date for date in player.dates_scored() if date < end_date and date.year == end_date.year]
+        for date in prev_dates:
+            if player.actual_score(end_date):
                 avg += player.actual_score(end_date)
-                n += 1
-        avg /= n
+            n += 1
+        if n > 0:
+            avg /= n
+        else:
+            avg = 0
     else:
         avg = conn.query('SELECT avg(fd_points) FROM ' + tableName(player, end_date) +
                          ' WHERE espnID = ' + str(player.espnID) + ' AND datenum < ' +
                          str(datenumOf(end_date)))
+        if avg:
+            avg = avg[0][0]
+        else:
+            avg = 0
     return avg
 
 # conn should already have connected
 # THIS IS THE MOST IMPORTANT METHOD
 def getHitterFeatures(conn, player, date):
     features = []
-    features.append(find_previous_n_game_scores(conn, player, date, HITTER_GAMES_BACK))
-    features.append(findAvgScoreForYear(conn, player, date))
+    features.extend(find_previous_n_game_scores(conn, player, date, HITTER_GAMES_BACK))
+    #features.append(findAvgScoreForYear(conn, player, date))
 
     return features
 
 # THIS IS THE MOST IMPORTANT METHOD
 def getPitcherFeatures(conn, player, date):
     features = []
-    features.append(find_previous_n_game_scores(conn, player, date, PITCHER_GAMES_BACK))
-    features.append(findAvgScoreForYear(conn, player, date))
+    features.extend(find_previous_n_game_scores(conn, player, date, PITCHER_GAMES_BACK))
+    #features.append(findAvgScoreForYear(conn, player, date))
 
     return features
 

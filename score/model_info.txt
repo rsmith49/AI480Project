@@ -1,0 +1,12 @@
+Hitter_NNR_Model2016_11_26__9_37_51.pkl R^2: 0.994792559575
+Pitcher_NNR_Model_2016_11_26__9_37_51.pkl R^2: 0.984475923242
+score/Hitter_NNR_Model2016_11_26__12_14_6.pkl R^2: 0.160309952539
+score/Pitcher_NNR_Model_2016_11_26__12_14_6.pkl R^2: 0.0126714744442
+score/Hitter_NNR_Model2016_11_26__12_47_4.pkl R^2: 0.11966663888
+score/Pitcher_NNR_Model_2016_11_26__12_47_4.pkl R^2: 0.125567005542
+score/Hitter_NNR_Model2016_11_26__13_17_2.pkl R^2: 0.112783636442
+score/Pitcher_NNR_Model_2016_11_26__13_17_2.pkl R^2: 0.0264677757313
+score/Hitter_NNR_Model2016_11_26__13_35_25.pkl R^2: 0.141695660121
+score/Pitcher_NNR_Model_2016_11_26__13_35_25.pkl R^2: 0.0532508234619
+score/Hitter_NNR_Model2016_11_26__13_53_52.pkl R^2: 0.138398173515
+score/Pitcher_NNR_Model_2016_11_26__13_53_52.pkl R^2: 0.168524375511

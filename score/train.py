@@ -19,9 +19,11 @@ pitcher_params = {
     'max_iter': 1000
 }
 
-PITCHER_FILE_PREFIX = 'Pitcher_NNR_Model_'
-HITTER_FILE_PREFIX = 'Hitter_NNR_Model'
+PITCHER_FILE_PREFIX = 'score/Pitcher_NNR_Model_'
+HITTER_FILE_PREFIX = 'score/Hitter_NNR_Model'
 FILE_POSTFIX = '.pkl'
+
+INFO_FILE = 'score/model_info.txt'
 
 def saveModel(model, filepath):
     joblib.dump(model, filepath)
@@ -126,8 +128,11 @@ def create_models(dates, should_test = False, test_perc = .1, save_model=False):
         test_hitter_data_in, test_hitter_data_out = getInputOutput(dates, test_hitters)
         test_pitcher_data_in, test_pitcher_data_out = getInputOutput(dates, test_pitchers)
 
-        print("Hitter model R^2 on test data: " + str(hitterModel.score(test_hitter_data_in, test_hitter_data_out)))
-        print("Pitcher model R^2 on test data: " + str(pitcherModel.score(test_pitcher_data_in, test_pitcher_data_out)))
+        hitter_score = hitterModel.score(test_hitter_data_in, test_hitter_data_out)
+        pitcher_score = pitcherModel.score(test_pitcher_data_in, test_pitcher_data_out)
+
+        print("Hitter model R^2 on test data: " + str(hitter_score))
+        print("Pitcher model R^2 on test data: " + str(pitcher_score))
 
 
     if save_model:
@@ -139,6 +144,14 @@ def create_models(dates, should_test = False, test_perc = .1, save_model=False):
 
         saveModel(hitterModel, filename_hitter)
         saveModel(pitcherModel, filename_pitcher)
+
+        if should_test:
+            # Need to add code to save metrics (R^2) about the filename, so we
+            # know which model is which
+            info_file = open(INFO_FILE, 'a')
+            info_file.write(filename_hitter + ' R^2: ' + str(hitter_score) + '\n')
+            info_file.write(filename_pitcher + ' R^2: ' + str(pitcher_score) + '\n')
+            info_file.close()
 
     return hitterModel, pitcherModel
 
