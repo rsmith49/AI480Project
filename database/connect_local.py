@@ -56,3 +56,9 @@ class Connection:
             return False
 
         return True
+
+if __name__ == '__main__':
+    conn = Connection()
+    conn.connect()
+    count_result = conn.query("SELECT COUNT(*) FROM active_players")
+    print(count_result)
