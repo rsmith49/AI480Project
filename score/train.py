@@ -3,18 +3,18 @@ from sklearn.externals import joblib
 from dateutil.parser import parse
 from database.connect_local import Connection
 from score.predict import getPlayerFeatures, datenum_to_str, load_all_feature_data
-from score.predict import HITTER_COLS, PITCHER_COLS
+from score.predict import HITTER_COLS, PITCHER_COLS, GAME_COLS
 from lineup.player import Hitter, Pitcher
 from datetime import datetime, timedelta
 import random, score.predict, numpy
 
-hitter_params = {
+default_hitter_params = {
     'hidden_layer_sizes': (32, 20),
     'solver': 'lbfgs',
     'max_iter': 1000
 }
 
-pitcher_params = {
+default_pitcher_params = {
     'hidden_layer_sizes': (22, 11),
     'solver': 'lbfgs',
     'max_iter': 1000
@@ -25,6 +25,8 @@ HITTER_FILE_PREFIX = 'Hitter_NNR_Model'
 FILE_POSTFIX = '.pkl'
 
 INFO_FILE = 'model_info.txt'
+DATES_QUERY_2014 = "SELECT DISTINCT `date` FROM player_daily_2014 WHERE datenum > 735700 " + \
+               "AND datenum <= (SELECT max(datenum) FROM game_info_2014)"
 
 def saveModel(model, filepath):
     joblib.dump(model, filepath)
@@ -59,7 +61,7 @@ def getInputOutput(dates, players, days_back_window = 0):
     return train_x, train_y
 
 # must create separate model for pitcher and hitter
-def trainPlayerModel(dates, players):
+def trainPlayerModel(dates, players, hitter_params, pitcher_params):
 
     model = MLPRegressor()
     if players[0].__class__ == Hitter:
@@ -73,12 +75,17 @@ def trainPlayerModel(dates, players):
 
     return model
 
-
-def create_models(dates, should_test = False, test_perc = .1, save_model=False):
+#Default: no test, 10% test set, don't save model, don't exclude any fields from
+#the ones in predict.py
+def create_models(dates, hitter_params, pitcher_params, should_test = False, test_perc = .1, save_model=False, exclude_col_names=()):
     conn = Connection()
     conn.connect()
 
-    load_all_feature_data(dates, conn, HITTER_COLS, PITCHER_COLS)
+    final_hitter_columns = [col for col in HITTER_COLS if col not in exclude_col_names]
+    final_pitcher_columns = [col for col in PITCHER_COLS if col not in exclude_col_names]
+    final_game_columns = [col for col in GAME_COLS if col not in exclude_col_names]
+
+    load_all_feature_data(dates, conn, final_hitter_columns, final_pitcher_columns, final_game_columns)
 
     hitters = []
     pitchers = []
@@ -91,7 +98,7 @@ def create_models(dates, should_test = False, test_perc = .1, save_model=False):
             datestr += "'" + datenum_to_str[date.month] + " " + str(date.day) + "',"
         datestr = datestr[:-1] + ')'
 
-        # hitters
+        # Get the IDs of all active hitters
         sqlquery = 'SELECT distinct espnID FROM player_daily_' + str(year) \
                 + ' WHERE `date` in ' + datestr
         hitterIDs = conn.query(sqlquery)
@@ -132,10 +139,10 @@ def create_models(dates, should_test = False, test_perc = .1, save_model=False):
         train_pitchers = pitchers
 
     print("Training Hitters")
-    hitterModel = trainPlayerModel(dates, train_hitters)
+    hitterModel = trainPlayerModel(dates, train_hitters, hitter_params, pitcher_params)
 
     print("Training Pitchers")
-    pitcherModel = trainPlayerModel(dates, train_pitchers)
+    pitcherModel = trainPlayerModel(dates, train_pitchers, hitter_params, pitcher_params)
 
     if should_test:
         test_hitter_data_in, test_hitter_data_out = getInputOutput(dates, test_hitters, days_back_window=7)
@@ -168,14 +175,22 @@ def create_models(dates, should_test = False, test_perc = .1, save_model=False):
 
     return hitterModel, pitcherModel
 
-if __name__ == '__main__':
+def train_new_models(hitter_params, pitcher_params, *exclude_col_names):
+    print("Creating new models")
+    print("Hitter params: " + str(hitter_params))
+    print("Pitcher params: " + str(pitcher_params))
+
     dates = []
     conn = Connection()
     conn.connect()
-    sqlquery = "SELECT DISTINCT `date` FROM player_daily_2014 WHERE datenum > 735700 " + \
-               "AND datenum <= (SELECT max(datenum) FROM game_info_2014)"
-    datestrs = conn.query(sqlquery)
+
+    datestrs = conn.query(DATES_QUERY_2014)
     conn.close()
     dates = [parse(datestr[0] + ' 2014') for datestr in datestrs]
+    create_models(dates, hitter_params, pitcher_params, should_test=True, save_model=True, exclude_col_names=exclude_col_names)
 
-    create_models(dates, should_test=True, save_model=True)
+
+
+if __name__ == '__main__':
+    train_new_models(default_hitter_params, default_pitcher_params)
+
