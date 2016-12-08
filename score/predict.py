@@ -44,17 +44,21 @@ datenum_to_str = {
 feature_data = {}
 
 def load_all_feature_data(dates, conn, hitter_cols=HITTER_COLS, pitcher_cols=PITCHER_COLS, game_cols=GAME_COLS):
+    all_lines = []
     for year in set([date.year for date in dates]):
+        max_date = max([date for date in dates if date.year == year])
         sqlquery = 'SELECT p.espnID, p.`date`'
         for col in hitter_cols:
             sqlquery += ', ' + col
         for col in game_cols:
             sqlquery += ', ' + col
         sqlquery += ' FROM game_info_' + str(year) + ' as g, player_daily_' + str(year) + ' as p ' + \
-                    'WHERE (g.home = p.opp OR g.vis = p.opp) AND g.datenum = p.datenum ORDER BY p.datenum'
+                    'WHERE TRIM(p.opp) in (TRIM(g.home), TRIM(g.vis)) AND g.datenum = p.datenum ' + \
+                    'AND p.datenum <= ' + str(datenumOf(max_date)) + ' ORDER BY p.datenum'
         query_player_output = conn.query(sqlquery)
 
         for line in query_player_output:
+            all_lines.append((line[0], line[1]))
             feature_dict = {}
             for ndx in range(len(hitter_cols) + len(game_cols)):
                 if ndx < len(hitter_cols):
@@ -69,10 +73,12 @@ def load_all_feature_data(dates, conn, hitter_cols=HITTER_COLS, pitcher_cols=PIT
         for col in game_cols:
             sqlquery += ', ' + col
         sqlquery += ' FROM game_info_' + str(year) + ' as g, pitcher_daily_' + str(year) + ' as p ' + \
-                    'WHERE (g.home = p.opp OR g.vis = p.opp) AND g.datenum = p.datenum ORDER BY p.datenum'
+                    'WHERE TRIM(p.opp) in (TRIM(g.home), TRIM(g.vis)) AND g.datenum = p.datenum ' + \
+                    'AND p.datenum <= ' + str(datenumOf(max_date)) + 'ORDER BY p.datenum'
         query_player_output = conn.query(sqlquery)
 
         for line in query_player_output:
+            all_lines.append((line[0], line[1]))
             feature_dict = {}
             for ndx in range(len(pitcher_cols) + len(game_cols)):
                 if ndx < len(pitcher_cols):
@@ -80,6 +86,11 @@ def load_all_feature_data(dates, conn, hitter_cols=HITTER_COLS, pitcher_cols=PIT
                 else:
                     feature_dict[game_cols[ndx - len(pitcher_cols)]] = line[ndx + 2]
             feature_data[(line[0], dateutil.parser.parse(line[1] + ' ' + str(year)))] = feature_dict
+    count = 0
+    all_lines = sorted(all_lines)
+    for ndx in range(1, len(all_lines)):
+        if all_lines[ndx] == all_lines[ndx - 1]:
+            count += 1
 
 
 
@@ -128,12 +139,15 @@ def find_previous_n_game_features(conn, player, date, n, scores_loaded=True):
             if scores[ndx] is None:
                 scores[ndx] = 0
 
-    if (player.espnID, date) not in feature_data:
-        print()
+    if ((player.espnID, date) not in feature_data):
+        print(player)
 
     features.extend([feature_data[(player.espnID, date)][key]
                             for key in sorted(feature_data[(player.espnID, date)].keys())
                      if key in GAME_COLS])
+    for ndx in range(len(features)):
+        if features[ndx] is None:
+            features[ndx] = 0
 
     return features
 

@@ -2,11 +2,11 @@ from sklearn.neural_network import MLPRegressor
 from sklearn.externals import joblib
 from dateutil.parser import parse
 from database.connect_local import Connection
-from score.predict import getPlayerFeatures, datenum_to_str, load_all_feature_data, feature_data
+from score.predict import getPlayerFeatures, datenum_to_str, load_all_feature_data
 from score.predict import HITTER_COLS, PITCHER_COLS
 from lineup.player import Hitter, Pitcher
 from datetime import datetime, timedelta
-import random
+import random, score.predict, numpy
 
 hitter_params = {
     'hidden_layer_sizes': (32, 20),
@@ -24,7 +24,7 @@ PITCHER_FILE_PREFIX = 'Pitcher_NNR_Model_'
 HITTER_FILE_PREFIX = 'Hitter_NNR_Model'
 FILE_POSTFIX = '.pkl'
 
-INFO_FILE = 'score/model_info.txt'
+INFO_FILE = 'model_info.txt'
 
 def saveModel(model, filepath):
     joblib.dump(model, filepath)
@@ -44,7 +44,11 @@ def getInputOutput(dates, players, days_back_window = 0):
     train_x = []
     train_y = []
     for date in dates:
-        for player in players:
+        # THIS IS GOING TO MAKE IT SO THAT IT IS ONLY GAMES THE PLAYERS PLAYED
+        # Does not account for sit out bias -- when a player gets benched or hurt
+        players_for_date = [player for player in players if player.actual_score(date) is not None]
+
+        for player in players_for_date:
             train_x.append(getPlayerFeatures(conn, player, date))
             if player.actual_score(date):
                 train_y.append(player.actual_score(date))
@@ -64,9 +68,11 @@ def trainPlayerModel(dates, players):
         model.set_params(**pitcher_params)
 
     train_x, train_y = getInputOutput(dates, players, days_back_window=7)
+
     model.fit(train_x, train_y)
 
     return model
+
 
 def create_models(dates, should_test = False, test_perc = .1, save_model=False):
     conn = Connection()
@@ -166,7 +172,7 @@ if __name__ == '__main__':
     dates = []
     conn = Connection()
     conn.connect()
-    sqlquery = 'SELECT DISTINCT `date` FROM player_daily_2014 WHERE datenum > 735700 LIMIT 1'
+    sqlquery = 'SELECT DISTINCT `date` FROM player_daily_2014 WHERE datenum > 735700'
     datestrs = conn.query(sqlquery)
     conn.close()
     dates = [parse(datestr[0] + ' 2014') for datestr in datestrs]
