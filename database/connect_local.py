@@ -27,7 +27,6 @@ class Connection:
         if (os.path.isfile(AWS_CFG_FILE)):
             cfg_file = open(AWS_CFG_FILE, 'r')
             aws_config = json.load(cfg_file)
-            print ("found AWS config object in " + AWS_CFG_FILE)
             self.cnx = mysql.connector.connect(**aws_config)
         else:
             self.cnx = mysql.connector.connect(**default_config)
