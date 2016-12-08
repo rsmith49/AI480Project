@@ -16,11 +16,14 @@ def datenumOf(datetime):
 def tableName(player, date):
     return player.table_prefix + '_daily_' + str(date.year)
 
-BEST_HITTER_MODEL_FILEPATH = 'score/Hitter_NNR_Model2016_11_26__9_37_51.pkl'
-BEST_PITCHER_MODEL_FILEPATH = 'score/Pitcher_NNR_Model_2016_11_26__9_37_51.pkl'
+BEST_HITTER_MODEL_FILEPATH = 'Hitter_NNR_Model2016_11_26__9_37_51.pkl'
+BEST_PITCHER_MODEL_FILEPATH = 'Pitcher_NNR_Model_2016_11_26__9_37_51.pkl'
+
+HITTER_COLS = ['p.result', 'p.r', 'p.h', 'p.hr', 'p.k', 'p.fd_points', 'g.temp', 'g.windSpeed', 'g.visibility', 'g.pressure']
+PITCHER_COLS = ['p.result', 'p.pitches', 'p.er', 'p.hr', 'p.k', 'p.bb', 'p.fd_points', 'g.temp', 'g.windSpeed', 'g.visibility', 'g.pressure']
 
 HITTER_GAMES_BACK = 7
-PITCHER_GAMES_BACK = 7
+PITCHER_GAMES_BACK = 4
 
 datenum_to_str = {
     1: 'Jan',
@@ -37,23 +40,57 @@ datenum_to_str = {
     12: 'Dec'
 }
 
+feature_data = {}
+
+def load_all_feature_data(dates, conn, hitter_cols, pitcher_cols):
+    for year in set([date.year for date in dates]):
+        sqlquery = 'SELECT p.espnID, p.`date`'
+        for col in hitter_cols:
+            sqlquery += ', ' + col
+        sqlquery += ' FROM game_info_' + str(year) + ' as g, player_daily_' + str(year) + ' as p ' + \
+                    'WHERE (g.home = p.opp OR g.vis = p.opp) AND g.datenum = p.datenum ORDER BY p.datenum'
+        query_player_output = conn.query(sqlquery)
+
+        for line in query_player_output:
+            feature_dict = {}
+            for ndx in range(len(hitter_cols)):
+                feature_dict[hitter_cols[ndx]] = line[ndx + 2]
+            feature_data[(line[0], dateutil.parser.parse(line[1] + ' ' + str(year)))] = feature_dict
+
+        sqlquery = 'SELECT p.espnID, p.`date`'
+        for col in pitcher_cols:
+            sqlquery += ', ' + col
+        sqlquery += ' FROM game_info_' + str(year) + ' as g, pitcher_daily_' + str(year) + ' as p ' + \
+                    'WHERE (g.home = p.opp OR g.vis = p.opp) AND g.datenum = p.datenum ORDER BY p.datenum'
+        query_player_output = conn.query(sqlquery)
+
+        for line in query_player_output:
+            feature_dict = {}
+            for ndx in range(len(pitcher_cols)):
+                feature_dict[pitcher_cols[ndx]] = line[ndx + 2]
+            feature_data[(line[0], dateutil.parser.parse(line[1] + ' ' + str(year)))] = feature_dict
+
+
+
 def load_model(filepath):
     return joblib.load(filepath)
 
 hitter_model = load_model(BEST_HITTER_MODEL_FILEPATH)
 pitcher_model = load_model(BEST_PITCHER_MODEL_FILEPATH)
 
-def find_previous_n_game_scores(conn, player, date, n, scores_loaded=True):
+def find_previous_n_game_features(conn, player, date, n, scores_loaded=True):
     if scores_loaded:
-        prev_dates = [prev_date for prev_date in player.real_score.keys() if
-                      prev_date < date and prev_date.year == date.year]
+
+        prev_dates = [prev_date for espnID,prev_date in feature_data.keys() if
+                      prev_date < date and prev_date.year == date.year and espnID == player.espnID]
         prev_dates = sorted(prev_dates)
         prev_dates = prev_dates[::-1]
         if len(prev_dates) < n:
-            scores = [player.actual_score(prev_date) for prev_date in prev_dates]
+            features = [feature_data[(player.espnID,prev_date)] for prev_date in prev_dates]
         else:
-            scores = [player.actual_score(prev_date) for prev_date in prev_dates[:n]]
+            features = [feature_data[(player.espnID,prev_date)] for prev_date in prev_dates[:n]]
     else:
+        ## Outdated for now
         table = player.table_prefix + '_daily_' + str(date.year)
         sqlquery = 'SELECT datenum FROM ' + table + \
                 " WHERE `date` = '" + datenum_to_str[date.month] + ' ' + str(date.day) + "'"
@@ -62,13 +99,13 @@ def find_previous_n_game_scores(conn, player, date, n, scores_loaded=True):
                 ' AND espnID = ' + str(player.espnID) + ' ORDER BY datenum DESC LIMIT ' + str(n)
         results = conn.query(sqlquery)
         scores = [score[0] for score in results]
-    if len(scores) < n:
-        for ndx in range(n - len(scores)):
-            scores.append(0)
-    for ndx in range(len(scores)):
-        if scores[ndx] is None:
-            scores[ndx] = 0
-    return scores
+        if len(scores) < n:
+            for ndx in range(n - len(scores)):
+                scores.append(0)
+        for ndx in range(len(scores)):
+            if scores[ndx] is None:
+                scores[ndx] = 0
+    return features
 
 def findAvgScoreForYear(conn, player, end_date, scores_loaded=True):
     if scores_loaded:
@@ -97,7 +134,7 @@ def findAvgScoreForYear(conn, player, end_date, scores_loaded=True):
 # THIS IS THE MOST IMPORTANT METHOD
 def getHitterFeatures(conn, player, date):
     features = []
-    features.extend(find_previous_n_game_scores(conn, player, date, HITTER_GAMES_BACK))
+    features.extend(find_previous_n_game_features(conn, player, date, HITTER_GAMES_BACK))
     #features.append(findAvgScoreForYear(conn, player, date))
 
     return features
@@ -105,7 +142,7 @@ def getHitterFeatures(conn, player, date):
 # THIS IS THE MOST IMPORTANT METHOD
 def getPitcherFeatures(conn, player, date):
     features = []
-    features.extend(find_previous_n_game_scores(conn, player, date, PITCHER_GAMES_BACK))
+    features.extend(find_previous_n_game_features(conn, player, date, PITCHER_GAMES_BACK))
     #features.append(findAvgScoreForYear(conn, player, date))
 
     return features

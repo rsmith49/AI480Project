@@ -135,7 +135,7 @@ class Player:
         return score
 
     def load_actual_scores(self, dates):
-        new_dates = [date for date in dates if not date in self.fd_salary.keys()]
+        new_dates = [date for date in dates if not date in self.real_score.keys()]
         if len(new_dates) == 0:
             return
 
@@ -155,6 +155,9 @@ class Player:
             for date_str, score in scores:
                 date = parse(date_str + " " + str(year))
                 self.real_score[date] = score
+        for date in dates:
+            if date not in self.real_score.keys():
+                self.real_score[date] = None
 
         conn.close()
 

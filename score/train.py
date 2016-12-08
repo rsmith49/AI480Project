@@ -2,25 +2,26 @@ from sklearn.neural_network import MLPRegressor
 from sklearn.externals import joblib
 from dateutil.parser import parse
 from database.connect_local import Connection
-from score.predict import getPlayerFeatures, datenum_to_str
+from score.predict import getPlayerFeatures, datenum_to_str, load_all_feature_data, feature_data
+from score.predict import HITTER_COLS, PITCHER_COLS
 from lineup.player import Hitter, Pitcher
 from datetime import datetime, timedelta
 import random
 
 hitter_params = {
-    'hidden_layer_sizes': (5, 5),
+    'hidden_layer_sizes': (32, 20),
     'solver': 'lbfgs',
     'max_iter': 1000
 }
 
 pitcher_params = {
-    'hidden_layer_sizes': (3, 3),
+    'hidden_layer_sizes': (22, 11),
     'solver': 'lbfgs',
     'max_iter': 1000
 }
 
-PITCHER_FILE_PREFIX = 'score/Pitcher_NNR_Model_'
-HITTER_FILE_PREFIX = 'score/Hitter_NNR_Model'
+PITCHER_FILE_PREFIX = 'Pitcher_NNR_Model_'
+HITTER_FILE_PREFIX = 'Hitter_NNR_Model'
 FILE_POSTFIX = '.pkl'
 
 INFO_FILE = 'score/model_info.txt'
@@ -29,12 +30,16 @@ def saveModel(model, filepath):
     joblib.dump(model, filepath)
 
 
-def getInputOutput(dates, players):
+def getInputOutput(dates, players, days_back_window = 0):
     conn = Connection()
     conn.connect()
     # To speed it up (not fully optimized, but oh well)
+    dates_to_load = []
+    for ndx in range(days_back_window, 0, -1):
+        dates_to_load.append(dates[0] - timedelta(days=ndx))
+    dates_to_load.extend(dates)
     for player in players:
-        player.load_actual_scores(dates)
+        player.load_actual_scores(dates_to_load)
 
     train_x = []
     train_y = []
@@ -58,7 +63,7 @@ def trainPlayerModel(dates, players):
     else:
         model.set_params(**pitcher_params)
 
-    train_x, train_y = getInputOutput(dates, players)
+    train_x, train_y = getInputOutput(dates, players, days_back_window=7)
     model.fit(train_x, train_y)
 
     return model
@@ -66,6 +71,8 @@ def trainPlayerModel(dates, players):
 def create_models(dates, should_test = False, test_perc = .1, save_model=False):
     conn = Connection()
     conn.connect()
+
+    load_all_feature_data(dates, conn, HITTER_COLS, PITCHER_COLS)
 
     hitters = []
     pitchers = []
@@ -125,8 +132,8 @@ def create_models(dates, should_test = False, test_perc = .1, save_model=False):
     pitcherModel = trainPlayerModel(dates, train_pitchers)
 
     if should_test:
-        test_hitter_data_in, test_hitter_data_out = getInputOutput(dates, test_hitters)
-        test_pitcher_data_in, test_pitcher_data_out = getInputOutput(dates, test_pitchers)
+        test_hitter_data_in, test_hitter_data_out = getInputOutput(dates, test_hitters, days_back_window=7)
+        test_pitcher_data_in, test_pitcher_data_out = getInputOutput(dates, test_pitchers, days_back_window=7)
 
         hitter_score = hitterModel.score(test_hitter_data_in, test_hitter_data_out)
         pitcher_score = pitcherModel.score(test_pitcher_data_in, test_pitcher_data_out)
