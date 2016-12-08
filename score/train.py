@@ -172,7 +172,8 @@ if __name__ == '__main__':
     dates = []
     conn = Connection()
     conn.connect()
-    sqlquery = 'SELECT DISTINCT `date` FROM player_daily_2014 WHERE datenum > 735700'
+    sqlquery = "SELECT DISTINCT `date` FROM player_daily_2014 WHERE datenum > 735700 AND " + \
+               "NOT `date` LIKE 'OCT%'"
     datestrs = conn.query(sqlquery)
     conn.close()
     dates = [parse(datestr[0] + ' 2014') for datestr in datestrs]
