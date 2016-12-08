@@ -20,8 +20,8 @@ default_pitcher_params = {
     'max_iter': 1000
 }
 
-PITCHER_FILE_PREFIX = 'Pitcher_NNR_Model_'
-HITTER_FILE_PREFIX = 'Hitter_NNR_Model'
+PITCHER_FILE_PREFIX = 'score/Pitcher_NNR_Model_'
+HITTER_FILE_PREFIX = 'score/Hitter_NNR_Model'
 FILE_POSTFIX = '.pkl'
 
 INFO_FILE = 'model_info.txt'

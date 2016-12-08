@@ -16,8 +16,8 @@ def datenumOf(datetime):
 def tableName(player, date):
     return player.table_prefix + '_daily_' + str(date.year)
 
-BEST_HITTER_MODEL_FILEPATH = 'Hitter_NNR_Model2016_11_26__9_37_51.pkl'
-BEST_PITCHER_MODEL_FILEPATH = 'Pitcher_NNR_Model_2016_11_26__9_37_51.pkl'
+BEST_HITTER_MODEL_FILEPATH = 'score/Hitter_NNR_Model2016_11_26__9_37_51.pkl'
+BEST_PITCHER_MODEL_FILEPATH = 'score/Pitcher_NNR_Model_2016_11_26__9_37_51.pkl'
 
 HITTER_COLS = ['p.r', 'p.h', 'p.hr', 'p.k', 'p.fd_points']
 PITCHER_COLS = ['p.pitches', 'p.er', 'p.hr', 'p.k', 'p.bb', 'p.fd_points']
